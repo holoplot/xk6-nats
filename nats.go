@@ -90,12 +90,12 @@ func (n *Nats) Close() {
 	}
 }
 
-func (n *Nats) Publish(topic, message string) error {
+func (n *Nats) Publish(topic string, message []byte) error {
 	if n.conn == nil {
 		return fmt.Errorf("the connection is not valid")
 	}
 
-	return n.conn.Publish(topic, []byte(message))
+	return n.conn.Publish(topic, message)
 }
 
 func (n *Nats) Subscribe(topic string, handler MessageHandler) error {
@@ -105,7 +105,7 @@ func (n *Nats) Subscribe(topic string, handler MessageHandler) error {
 
 	_, err := n.conn.Subscribe(topic, func(msg *natsio.Msg) {
 		message := Message{
-			Data:  string(msg.Data),
+			Data:  msg.Data,
 			Topic: msg.Subject,
 		}
 		handler(message)
@@ -151,7 +151,7 @@ func (n *Nats) JetStreamDelete(name string) error {
 }
 
 
-func (n *Nats) JetStreamPublish(topic string, message string) error {
+func (n *Nats) JetStreamPublish(topic string, message []byte) error {
 	if n.conn == nil {
 		return fmt.Errorf("the connection is not valid")
 	}
@@ -161,7 +161,7 @@ func (n *Nats) JetStreamPublish(topic string, message string) error {
                 return fmt.Errorf("cannot accquire jetstream context %w", err)
         }
 
-        _, err = js.Publish(topic, []byte(message))
+        _, err = js.Publish(topic, message)
 
         return err
 }
@@ -178,7 +178,7 @@ func (n *Nats) JetStreamSubscribe(topic string, handler MessageHandler) error {
 
         sub, err := js.Subscribe(topic, func(msg *natsio.Msg) {
 		message := Message{
-			Data:  string(msg.Data),
+			Data:  msg.Data,
 			Topic: msg.Subject,
 		}
 		handler(message)
@@ -213,18 +213,22 @@ func (n *Nats) JetStreamSubscribeSync(topic string) (*natsio.Subscription, error
 }
 
 
-func (n *Nats) Request(subject, data string) (Message, error) {
+func (n *Nats) Request(subject string, data []byte, timeout time.Duration) (Message, error) {
+	if timeout == 0 {
+		timeout = 1 * time.Second
+	}
+
 	if n.conn == nil {
 		return Message{}, fmt.Errorf("the connection is not valid")
 	}
 
-	msg, err := n.conn.Request(subject, []byte(data), 5*time.Second)
+	msg, err := n.conn.Request(subject, data,  timeout)
 	if err != nil {
 		return Message{}, err
 	}
 
 	return Message{
-		Data:  string(msg.Data),
+		Data:  msg.Data,
 		Topic: msg.Subject,
 	}, nil
 }
@@ -236,7 +240,7 @@ type Configuration struct {
 }
 
 type Message struct {
-	Data  string
+	Data  []byte
 	Topic string
 }
 
